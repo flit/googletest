@@ -4420,7 +4420,11 @@ UnitTestImpl::UnitTestImpl(UnitTest* parent)
 #endif
       // Will be overridden by the flag before first use.
       catch_exceptions_(false),
+#if GTEST_OS_BARE_METAL
+      result_listener_(new BaseStoredResultEventListener),
+#else
       result_listener_(new DefaultStoredResultEventListener),
+#endif
       store_test_part_results_(true){
   listeners()->SetDefaultResultPrinter(new PrettyUnitTestResultPrinter);
 }
