@@ -210,7 +210,7 @@
 //
 // Synchronization:
 //   Mutex, MutexLock, ThreadLocal, GetThreadCount()
-//                            - synchronization primitives.
+//                  - synchronization primitives.
 //
 // Template meta programming:
 //   is_pointer     - as in TR1; needed on Symbian and IBM XL C/C++ only.
@@ -261,7 +261,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#ifndef _WIN32_WCE
+#if !defined(_WIN32_WCE) && !GTEST_OS_BARE_METAL
 # include <sys/types.h>
 # include <sys/stat.h>
 #endif  // !_WIN32_WCE
@@ -292,6 +292,8 @@
 #endif  // __GNUC__
 
 // Determines the platform on which Google Test is compiled.
+#ifndef GTEST_OS_BARE_METAL
+
 #ifdef __CYGWIN__
 # define GTEST_OS_CYGWIN 1
 #elif defined __SYMBIAN32__
@@ -310,10 +312,10 @@
 #   define GTEST_OS_WINDOWS_PHONE 1
 #  elif WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_APP)
 #   define GTEST_OS_WINDOWS_RT 1
-#  else
+# else
     // WINAPI_FAMILY defined but no known partition matched.
     // Default to desktop.
-#   define GTEST_OS_WINDOWS_DESKTOP 1
+#  define GTEST_OS_WINDOWS_DESKTOP 1
 #  endif
 # else
 #  define GTEST_OS_WINDOWS_DESKTOP 1
@@ -322,7 +324,7 @@
 # define GTEST_OS_MAC 1
 # if TARGET_OS_IPHONE
 #  define GTEST_OS_IOS 1
-# endif
+#  endif
 #elif defined __FreeBSD__
 # define GTEST_OS_FREEBSD 1
 #elif defined __linux__
@@ -345,6 +347,7 @@
 #elif defined __QNX__
 # define GTEST_OS_QNX 1
 #endif  // __CYGWIN__
+#endif // GTEST_OS_BARE_METAL
 
 // Macros for disabling Microsoft Visual C++ warnings.
 //
@@ -432,6 +435,7 @@
 
 // Brings in definitions for functions used in the testing::internal::posix
 // namespace (read, write, close, chdir, isatty, stat). We do not currently
+#if !GTEST_OS_BARE_METAL
 // use them on Windows Mobile.
 #if GTEST_OS_WINDOWS
 # if !GTEST_OS_WINDOWS_MOBILE
@@ -450,6 +454,7 @@ struct _RTL_CRITICAL_SECTION;
 # include <unistd.h>
 # include <strings.h>
 #endif  // GTEST_OS_WINDOWS
+#endif // GTEST_OS_BARE_METAL
 
 #if GTEST_OS_LINUX_ANDROID
 // Used to define __ANDROID_API__ matching the target NDK API level.
@@ -1058,10 +1063,10 @@ class Secret;
 # define GTEST_COMPILE_ASSERT_(expr, msg) static_assert(expr, #msg)
 #else  // !GTEST_LANG_CXX11
 template <bool>
-  struct CompileAssert {
+struct CompileAssert {
 };
 
-# define GTEST_COMPILE_ASSERT_(expr, msg) \
+#define GTEST_COMPILE_ASSERT_(expr, msg) \
   typedef ::testing::internal::CompileAssert<(static_cast<bool>(expr))> \
       msg[static_cast<bool>(expr) ? 1 : -1] GTEST_ATTRIBUTE_UNUSED_
 #endif  // !GTEST_LANG_CXX11
@@ -1453,7 +1458,7 @@ extern ::std::vector<testing::internal::string> g_argvs;
 
 // Defines synchronization primitives.
 #if GTEST_IS_THREADSAFE
-# if GTEST_HAS_PTHREAD
+#if GTEST_HAS_PTHREAD
 // Sleeps for (roughly) n milliseconds.  This function is only for testing
 // Google Test's own constructs.  Don't use it in user tests, either
 // directly or indirectly.
@@ -1936,8 +1941,8 @@ class MutexBase {
 };
 
 // Forward-declares a static mutex.
-#  define GTEST_DECLARE_STATIC_MUTEX_(mutex) \
-     extern ::testing::internal::MutexBase mutex
+# define GTEST_DECLARE_STATIC_MUTEX_(mutex) \
+    extern ::testing::internal::MutexBase mutex
 
 // Defines and statically (i.e. at link time) initializes a static mutex.
 // The initialization list here does not explicitly initialize each field,
@@ -1945,8 +1950,8 @@ class MutexBase {
 // particular, the owner_ field (a pthread_t) is not explicitly initialized.
 // This allows initialization to work whether pthread_t is a scalar or struct.
 // The flag -Wmissing-field-initializers must not be specified for this to work.
-#  define GTEST_DEFINE_STATIC_MUTEX_(mutex) \
-     ::testing::internal::MutexBase mutex = { PTHREAD_MUTEX_INITIALIZER, false }
+# define GTEST_DEFINE_STATIC_MUTEX_(mutex) \
+    ::testing::internal::MutexBase mutex = { PTHREAD_MUTEX_INITIALIZER, false }
 
 // The Mutex class can only be used for mutexes created at runtime. It
 // shares its API with MutexBase otherwise.
@@ -2275,6 +2280,20 @@ inline bool IsDir(const StatStruct& st) {
 }
 # endif  // GTEST_OS_WINDOWS_MOBILE
 
+#elif GTEST_OS_BARE_METAL
+
+typedef struct { int x; } StatStruct;
+
+inline int FileNo(FILE* file) { return fileno(file); }
+inline int IsATTY(int fd) { return 0; }
+inline int Stat(const char* path, StatStruct* buf) { return -1; }
+inline int StrCaseCmp(const char* s1, const char* s2) {
+  return strcasecmp(s1, s2);
+}
+inline char* StrDup(const char* src) { return strdup(src); }
+inline int RmDir(const char* dir) { return -1; }
+inline bool IsDir(const StatStruct& st) { return false; }
+
 #else
 
 typedef struct stat StatStruct;
@@ -2303,20 +2322,20 @@ inline const char* StrNCpy(char* dest, const char* src, size_t n) {
 // StrError() aren't needed on Windows CE at this time and thus not
 // defined there.
 
-#if !GTEST_OS_WINDOWS_MOBILE && !GTEST_OS_WINDOWS_PHONE && !GTEST_OS_WINDOWS_RT
+#if !GTEST_OS_WINDOWS_MOBILE && !GTEST_OS_WINDOWS_PHONE && !GTEST_OS_WINDOWS_RT && !GTEST_OS_BARE_METAL
 inline int ChDir(const char* dir) { return chdir(dir); }
 #endif
 inline FILE* FOpen(const char* path, const char* mode) {
   return fopen(path, mode);
 }
-#if !GTEST_OS_WINDOWS_MOBILE
+#if !GTEST_OS_WINDOWS_MOBILE && !GTEST_OS_BARE_METAL
 inline FILE *FReopen(const char* path, const char* mode, FILE* stream) {
   return freopen(path, mode, stream);
 }
 inline FILE* FDOpen(int fd, const char* mode) { return fdopen(fd, mode); }
 #endif
 inline int FClose(FILE* fp) { return fclose(fp); }
-#if !GTEST_OS_WINDOWS_MOBILE
+#if !GTEST_OS_WINDOWS_MOBILE && !GTEST_OS_BARE_METAL
 inline int Read(int fd, void* buf, unsigned int count) {
   return static_cast<int>(read(fd, buf, count));
 }
@@ -2327,7 +2346,7 @@ inline int Close(int fd) { return close(fd); }
 inline const char* StrError(int errnum) { return strerror(errnum); }
 #endif
 inline const char* GetEnv(const char* name) {
-#if GTEST_OS_WINDOWS_MOBILE || GTEST_OS_WINDOWS_PHONE | GTEST_OS_WINDOWS_RT
+#if GTEST_OS_WINDOWS_MOBILE || GTEST_OS_WINDOWS_PHONE | GTEST_OS_WINDOWS_RT || GTEST_OS_BARE_METAL
   // We are on Windows CE, which has no environment variables.
   static_cast<void>(name);  // To prevent 'unused argument' warning.
   return NULL;

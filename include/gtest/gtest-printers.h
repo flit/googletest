@@ -100,6 +100,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <wchar.h>
 #include "gtest/internal/gtest-port.h"
 #include "gtest/internal/gtest-internal.h"
 
@@ -828,8 +829,8 @@ struct TuplePrefixPrinter {
     GTEST_INTENTIONAL_CONST_COND_PUSH_()
     if (N > 1) {
     GTEST_INTENTIONAL_CONST_COND_POP_()
-      *os << ", ";
-    }
+    *os << ", ";
+  }
     UniversalPrinter<
         typename TuplePolicy<Tuple>::template tuple_element<N - 1>::type>
         ::Print(TuplePolicy<Tuple>::template get<N - 1>(t), os);
@@ -858,7 +859,7 @@ struct TuplePrefixPrinter<0> {
 
 // Helper function for printing a tuple.
 // Tuple must be either std::tr1::tuple or std::tuple type.
-template <typename Tuple>
+  template <typename Tuple>
 void PrintTupleTo(const Tuple& t, ::std::ostream* os) {
   *os << "(";
   TuplePrefixPrinter<TuplePolicy<Tuple>::tuple_size>::PrintPrefixTo(t, os);

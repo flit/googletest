@@ -107,6 +107,8 @@
 # include <windows.h>  // NOLINT
 # undef min
 
+#elif GTEST_OS_BARE_METAL
+
 #else
 
 // Assume other platforms have gettimeofday().
@@ -821,6 +823,8 @@ TimeInMillis GetTimeInMillis() {
   struct timeval now;
   gettimeofday(&now, NULL);
   return static_cast<TimeInMillis>(now.tv_sec) * 1000 + now.tv_usec / 1000;
+#elif GTEST_OS_BARE_METAL
+  return static_cast<TimeInMillis>(clock());
 #else
 # error "Don't know how to get the current time on your system."
 #endif
@@ -3508,7 +3512,7 @@ std::string FormatTimeInMillisAsSeconds(TimeInMillis ms) {
 static bool PortableLocaltime(time_t seconds, struct tm* out) {
 #if defined(_MSC_VER)
   return localtime_s(out, &seconds) == 0;
-#elif defined(__MINGW32__) || defined(__MINGW64__)
+#elif defined(__MINGW32__) || defined(__MINGW64__) || GTEST_OS_BARE_METAL
   // MINGW <time.h> provides neither localtime_r nor localtime_s, but uses
   // Windows' localtime(), which has a thread-local tm buffer.
   struct tm* tm_ptr = localtime(&seconds);  // NOLINT

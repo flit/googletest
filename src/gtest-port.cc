@@ -40,8 +40,7 @@
 # include <windows.h>
 # include <io.h>
 # include <sys/stat.h>
-# include <map>  // Used in ThreadLocal.
-#else
+#elif !GTEST_OS_BARE_METAL
 # include <unistd.h>
 #endif  // GTEST_OS_WINDOWS
 
@@ -74,7 +73,7 @@
 namespace testing {
 namespace internal {
 
-#if defined(_MSC_VER) || defined(__BORLANDC__)
+#if defined(_MSC_VER) || defined(__BORLANDC__) || GTEST_OS_BARE_METAL
 // MSVC and C++Builder do not provide a definition of STDERR_FILENO.
 const int kStdOutFileno = 1;
 const int kStdErrFileno = 2;
