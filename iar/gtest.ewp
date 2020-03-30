@@ -1957,6 +1957,9 @@
   </file>
   <file>
     <name>$PROJ_DIR$\..\samples\sample3_unittest.cc</name>
+    <excluded>
+      <configuration>Debug</configuration>
+    </excluded>
   </file>
 </project>
 
