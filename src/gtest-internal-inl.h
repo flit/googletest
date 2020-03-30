@@ -482,6 +482,9 @@ class DefaultGlobalTestPartResultReporter
  private:
   UnitTestImpl* const unit_test_;
 
+  // Call functions for storing test part results.
+  void StoreTestPartResult(const TestPartResult& result);
+
   GTEST_DISALLOW_COPY_AND_ASSIGN_(DefaultGlobalTestPartResultReporter);
 };
 
@@ -811,8 +814,20 @@ class GTEST_API_ UnitTestImpl {
   // UnitTest::Run() starts.
   bool catch_exceptions() const { return catch_exceptions_; }
 
+  // Set the event listener for stored test part results that can be used to
+  // track events inside Google Test.
+  void SetStoredResultEventListener(StoredResultEventListener* a_result_listener);
+
+  // Get the event listener for stored test part results that can be used to
+  // track events inside Google Test.
+  StoredResultEventListener* GetStoredResultEventListener();
+
  private:
   friend class ::testing::UnitTest;
+
+  // The StoredResultEventListener object that owns implementation for event listener
+  // for stored test part results.
+  StoredResultEventListener* result_listener_;
 
   // Used by UnitTest::Run() to capture the state of
   // GTEST_FLAG(catch_exceptions) at the moment it starts.
@@ -1032,7 +1047,7 @@ class TestResultAccessor {
     test_result->ClearTestPartResults();
   }
 
-  static const std::vector<testing::TestPartResult>& test_part_results(
+  static const std::vector<const testing::BaseTestPartResult*>& test_part_results(
       const TestResult& test_result) {
     return test_result.test_part_results();
   }

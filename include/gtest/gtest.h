@@ -551,10 +551,10 @@ class GTEST_API_ TestResult {
   // Returns the elapsed time, in milliseconds.
   TimeInMillis elapsed_time() const { return elapsed_time_; }
 
-  // Returns the i-th test part result among all the results. i can range
-  // from 0 to test_property_count() - 1. If i is not in that range, aborts
-  // the program.
-  const TestPartResult& GetTestPartResult(int i) const;
+  // Returns the pointer to i-th base test part result among all the results.
+  // i can range from 0 to test_property_count() - 1. If i is not in that range,
+  // aborts the program.
+  const BaseTestPartResult* GetTestPartResult(int i) const;
 
   // Returns the i-th test property. i can range from 0 to
   // test_property_count() - 1. If i is not in that range, aborts the
@@ -571,8 +571,8 @@ class GTEST_API_ TestResult {
   friend class internal::UnitTestImpl;
   friend class internal::WindowsDeathTest;
 
-  // Gets the vector of TestPartResults.
-  const std::vector<TestPartResult>& test_part_results() const {
+  // Gets the vector of const BaseTestPartResult*.
+  const std::vector<const BaseTestPartResult*>& test_part_results() const {
     return test_part_results_;
   }
 
@@ -600,7 +600,7 @@ class GTEST_API_ TestResult {
                                    const TestProperty& test_property);
 
   // Adds a test part result to the list.
-  void AddTestPartResult(const TestPartResult& test_part_result);
+  void AddTestPartResult(const BaseTestPartResult* test_part_result);
 
   // Returns the death test count.
   int death_test_count() const { return death_test_count_; }
@@ -618,8 +618,8 @@ class GTEST_API_ TestResult {
   // properties, whose values may be updated.
   internal::Mutex test_properites_mutex_;
 
-  // The vector of TestPartResults
-  std::vector<TestPartResult> test_part_results_;
+  // The vector of const BaseTestPartResult*.
+  std::vector<const BaseTestPartResult*> test_part_results_;
   // The vector of TestProperties
   std::vector<TestProperty> test_properties_;
   // Running count of death tests.
@@ -1130,6 +1130,35 @@ class GTEST_API_ TestEventListeners {
   GTEST_DISALLOW_COPY_AND_ASSIGN_(TestEventListeners);
 };
 
+// The interface for tracing stored tests part results.
+class StoredResultEventListener {
+ public:
+  virtual ~StoredResultEventListener() {}
+
+  // Fired before storing test part results. In this method have to be returned new object.
+  // New object should inherit from BaseTestPartResult class (or just use BaseTestPartResult class).
+  // User can decide which data from test_part_result want store and which not. Also user can store some
+  // additional data.
+  virtual const BaseTestPartResult* TransformTestPartResult(const TestPartResult& test_part_result) = 0;
+
+  // Fired for adding data from base_test_part_result to output xml. This object should be cast to inheritor
+  // to get access to all stored data.
+  virtual void OutputXmlTestPartResult(::std::ostream* stream,
+                                       const BaseTestPartResult* base_test_part_result) = 0;
+};
+
+// The convenience class for users who need to override just one or two
+// methods and are not concerned that a possible change to a signature of
+// the methods they override will not be caught during the build. For
+// comments about each method please see the definition of StoredResultEventListener
+// above.
+class EmptyStoredResultEventListener : public StoredResultEventListener{
+ public:
+  virtual const BaseTestPartResult* TransformTestPartResult(const TestPartResult& /* test_part_result */) {};
+  virtual void OutputXmlTestPartResult(::std::ostream* /* stream */,
+                                       const BaseTestPartResult* /* base_test_part_result */) {};
+};
+
 // A UnitTest consists of a vector of TestCases.
 //
 // This is a singleton class.  The only instance of UnitTest is
@@ -1240,6 +1269,14 @@ class GTEST_API_ UnitTest {
   // Returns the list of event listeners that can be used to track events
   // inside Google Test.
   TestEventListeners& listeners();
+
+  // Set the event listener for stored test part results that can be used to
+  // track events inside Google Test.
+  void SetStoredResultEventListener(StoredResultEventListener* a_result_listener);
+
+  // Get the event listener for stored test part results that can be used to
+  // track events inside Google Test.
+  StoredResultEventListener* GetStoredResultEventListener();
 
  private:
   // Registers and returns a global test environment.  When a test

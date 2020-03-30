@@ -42,9 +42,8 @@ namespace testing {
 
 // A copyable object representing the result of a test part (i.e. an
 // assertion or an explicit FAIL(), ADD_FAILURE(), or SUCCESS()).
-//
-// Don't inherit from TestPartResult as its destructor is not virtual.
-class GTEST_API_ TestPartResult {
+// This can be used for inheritance.
+class BaseTestPartResult{
  public:
   // The possible outcomes of a test part (i.e. an assertion or an
   // explicit SUCCEED(), FAIL(), or ADD_FAILURE()).
@@ -54,6 +53,28 @@ class GTEST_API_ TestPartResult {
     kFatalFailure      // Failed and the test should be terminated.
   };
 
+  // C'tor.  BaseTestPartResult does NOT have a default constructor.
+  // Always use this constructor (with parameters) to create a
+  // BaseTestPartResult object.
+  BaseTestPartResult(Type type){type_ = type;}
+
+  // D'tor. BaseTestPartResult have a virtual destructor because it could
+  // be used for inheritance.
+  virtual ~BaseTestPartResult(){};
+
+  // Gets the outcome of the test part.
+  Type type() const { return type_; }
+
+ protected:
+  Type type_;
+};
+
+// A copyable object representing the result of a test part (i.e. an
+// assertion or an explicit FAIL(), ADD_FAILURE(), or SUCCESS()).
+//
+// Don't inherit from TestPartResult as its destructor is not virtual.
+class GTEST_API_ TestPartResult : public BaseTestPartResult {
+ public:
   // C'tor.  TestPartResult does NOT have a default constructor.
   // Always use this constructor (with parameters) to create a
   // TestPartResult object.
@@ -61,15 +82,12 @@ class GTEST_API_ TestPartResult {
                  const char* a_file_name,
                  int a_line_number,
                  const char* a_message)
-      : type_(a_type),
+      : BaseTestPartResult(a_type),
         file_name_(a_file_name == NULL ? "" : a_file_name),
         line_number_(a_line_number),
         summary_(ExtractSummary(a_message)),
         message_(a_message) {
   }
-
-  // Gets the outcome of the test part.
-  Type type() const { return type_; }
 
   // Gets the name of the source file where the test part took place, or
   // NULL if it's unknown.
@@ -100,8 +118,6 @@ class GTEST_API_ TestPartResult {
   bool fatally_failed() const { return type_ == kFatalFailure; }
 
  private:
-  Type type_;
-
   // Gets the summary of the failure message by omitting the stack
   // trace in it.
   static std::string ExtractSummary(const char* message);

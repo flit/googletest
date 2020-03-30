@@ -672,8 +672,14 @@ DefaultGlobalTestPartResultReporter::DefaultGlobalTestPartResultReporter(
 
 void DefaultGlobalTestPartResultReporter::ReportTestPartResult(
     const TestPartResult& result) {
-  unit_test_->current_test_result()->AddTestPartResult(result);
+  StoreTestPartResult(result);
   unit_test_->listeners()->repeater()->OnTestPartResult(result);
+}
+
+void DefaultGlobalTestPartResultReporter::StoreTestPartResult(
+    const TestPartResult& result){
+    const BaseTestPartResult * baseTestPartResult = unit_test_->GetStoredResultEventListener()->TransformTestPartResult(result);
+    unit_test_->current_test_result()->AddTestPartResult(baseTestPartResult);
 }
 
 DefaultPerThreadTestPartResultReporter::DefaultPerThreadTestPartResultReporter(
@@ -1991,7 +1997,7 @@ TestResult::~TestResult() {
 // Returns the i-th test part result among all the results. i can
 // range from 0 to total_part_count() - 1. If i is not in that range,
 // aborts the program.
-const TestPartResult& TestResult::GetTestPartResult(int i) const {
+const BaseTestPartResult* TestResult::GetTestPartResult(int i) const {
   if (i < 0 || i >= total_part_count())
     internal::posix::Abort();
   return test_part_results_.at(i);
@@ -2008,11 +2014,15 @@ const TestProperty& TestResult::GetTestProperty(int i) const {
 
 // Clears the test part results.
 void TestResult::ClearTestPartResults() {
+  for (int i =0; i< test_part_results_.size();i++)
+  {
+    delete (test_part_results_[i]);
+  }
   test_part_results_.clear();
 }
 
 // Adds a test part result to the list.
-void TestResult::AddTestPartResult(const TestPartResult& test_part_result) {
+void TestResult::AddTestPartResult(const BaseTestPartResult* test_part_result) {
   test_part_results_.push_back(test_part_result);
 }
 
@@ -2125,7 +2135,7 @@ bool TestResult::ValidateTestProperty(const std::string& xml_element,
 
 // Clears the object.
 void TestResult::Clear() {
-  test_part_results_.clear();
+  ClearTestPartResults();
   test_properties_.clear();
   death_test_count_ = 0;
   elapsed_time_ = 0;
@@ -2134,15 +2144,15 @@ void TestResult::Clear() {
 // Returns true iff the test failed.
 bool TestResult::Failed() const {
   for (int i = 0; i < total_part_count(); ++i) {
-    if (GetTestPartResult(i).failed())
+    if (GetTestPartResult(i)->type() != BaseTestPartResult::kSuccess)
       return true;
   }
   return false;
 }
 
 // Returns true iff the test part fatally failed.
-static bool TestPartFatallyFailed(const TestPartResult& result) {
-  return result.fatally_failed();
+static bool TestPartFatallyFailed(const BaseTestPartResult* result) {
+  return result->type() == BaseTestPartResult::kFatalFailure;
 }
 
 // Returns true iff the test fatally failed.
@@ -2151,8 +2161,8 @@ bool TestResult::HasFatalFailure() const {
 }
 
 // Returns true iff the test part non-fatally failed.
-static bool TestPartNonfatallyFailed(const TestPartResult& result) {
-  return result.nonfatally_failed();
+static bool TestPartNonfatallyFailed(const BaseTestPartResult* result) {
+  return result->type() == BaseTestPartResult::kNonFatalFailure;
 }
 
 // Returns true iff the test has a non-fatal failure.
@@ -3306,6 +3316,10 @@ class XmlUnitTestResultPrinter : public EmptyTestEventListener {
 
   virtual void OnTestIterationEnd(const UnitTest& unit_test, int iteration);
 
+  // Streams an XML representation of a TestPartResult object.
+  static void OutputXmlTestPartResult(::std::ostream* stream,
+                                      const BaseTestPartResult *base_test_part_result);
+
  private:
   // Is c a whitespace character that is normalized to a space character
   // when it appears in an XML attribute value?
@@ -3602,20 +3616,12 @@ void XmlUnitTestResultPrinter::OutputXmlTestInfo(::std::ostream* stream,
 
   int failures = 0;
   for (int i = 0; i < result.total_part_count(); ++i) {
-    const TestPartResult& part = result.GetTestPartResult(i);
-    if (part.failed()) {
+    const BaseTestPartResult* part = result.GetTestPartResult(i);
+    if (part->type() != BaseTestPartResult::kSuccess) {
       if (++failures == 1) {
         *stream << ">\n";
       }
-      const string location = internal::FormatCompilerIndependentFileLocation(
-          part.file_name(), part.line_number());
-      const string summary = location + "\n" + part.summary();
-      *stream << "      <failure message=\""
-              << EscapeXmlAttribute(summary.c_str())
-              << "\" type=\"\">";
-      const string detail = location + "\n" + part.message();
-      OutputXmlCDataSection(stream, RemoveInvalidXmlCharacters(detail).c_str());
-      *stream << "</failure>\n";
+      UnitTest::GetInstance()->GetStoredResultEventListener()->OutputXmlTestPartResult(stream, part);
     }
   }
 
@@ -3623,6 +3629,23 @@ void XmlUnitTestResultPrinter::OutputXmlTestInfo(::std::ostream* stream,
     *stream << " />\n";
   else
     *stream << "    </testcase>\n";
+}
+
+// Prints an XML representation of a TestPartResult object.
+void XmlUnitTestResultPrinter::OutputXmlTestPartResult(::std::ostream* stream,
+                                                       const BaseTestPartResult *base_test_part_result){
+  const TestPartResult* part = dynamic_cast<const TestPartResult*>(base_test_part_result);
+  if(part != NULL){
+    const string location = internal::FormatCompilerIndependentFileLocation(
+    part->file_name(), part->line_number());
+    const string summary = location + "\n" + part->summary();
+    *stream << "      <failure message=\""
+           << EscapeXmlAttribute(summary.c_str())
+           << "\" type=\"\">";
+    const string detail = location + "\n" + part->message();
+    OutputXmlCDataSection(stream, RemoveInvalidXmlCharacters(detail).c_str());
+    *stream << "</failure>\n";
+  }
 }
 
 // Prints an XML representation of a TestCase object
@@ -3704,6 +3727,30 @@ std::string XmlUnitTestResultPrinter::TestPropertiesAsXmlAttributes(
 }
 
 // End XmlUnitTestResultPrinter
+
+// Class DefaultStoredResultEventListener is copyable.
+//
+// This class implements the TestPartResultEventListener interface
+class DefaultStoredResultEventListener : public StoredResultEventListener{
+ public:
+  DefaultStoredResultEventListener(){}
+
+  // The following methods override what's in the TestPartResultEventListener class.
+  virtual const BaseTestPartResult* TransformTestPartResult(const TestPartResult& test_part_result);
+  virtual void OutputXmlTestPartResult(::std::ostream* stream ,
+                                       const BaseTestPartResult* base_test_part_result);
+};
+
+const BaseTestPartResult* DefaultStoredResultEventListener::TransformTestPartResult(const TestPartResult& test_part_result) {
+  return new TestPartResult(test_part_result.type(),test_part_result.file_name(), test_part_result.line_number(), test_part_result.message());
+};
+
+void DefaultStoredResultEventListener::OutputXmlTestPartResult(::std::ostream* stream,
+                                                               const BaseTestPartResult* base_test_part_result) {
+  XmlUnitTestResultPrinter::OutputXmlTestPartResult(stream, base_test_part_result);
+};
+
+// End DefaultStoredResultEventListener
 
 #if GTEST_CAN_STREAM_RESULTS_
 
@@ -4047,6 +4094,18 @@ TestEventListeners& UnitTest::listeners() {
   return *impl()->listeners();
 }
 
+// Set the event listener for stored test part results that can be used to
+// track events inside Google Test.
+void UnitTest::SetStoredResultEventListener(StoredResultEventListener* a_result_listener){
+    impl()->SetStoredResultEventListener(a_result_listener);
+}
+
+// Get the event listener for stored test part results that can be used to
+// track events inside Google Test.
+StoredResultEventListener* UnitTest::GetStoredResultEventListener(){
+    return impl()->GetStoredResultEventListener();
+}
+
 // Registers and returns a global test environment.  When a test
 // program is run, all global test environments will be set-up in the
 // order they were registered.  After all tests in the program have
@@ -4315,7 +4374,8 @@ UnitTestImpl::UnitTestImpl(UnitTest* parent)
       death_test_factory_(new DefaultDeathTestFactory),
 #endif
       // Will be overridden by the flag before first use.
-      catch_exceptions_(false) {
+      catch_exceptions_(false),
+      result_listener_(new DefaultStoredResultEventListener) {
   listeners()->SetDefaultResultPrinter(new PrettyUnitTestResultPrinter);
 }
 
@@ -4909,6 +4969,22 @@ void UnitTestImpl::UnshuffleTests() {
     // Resets the index of each test case.
     test_case_indices_[i] = static_cast<int>(i);
   }
+}
+
+// Set the event listener for stored test part results that can be used to
+// track events inside Google Test.
+void UnitTestImpl::SetStoredResultEventListener(StoredResultEventListener* a_result_listener) {
+  if(result_listener_ != NULL)
+  {
+      delete result_listener_;
+  }
+  result_listener_ = a_result_listener;
+}
+
+// Get the event listener for stored test part results that can be used to
+// track events inside Google Test.
+StoredResultEventListener* UnitTestImpl::GetStoredResultEventListener(){
+  return result_listener_;
 }
 
 // Returns the current OS stack trace as an std::string.
