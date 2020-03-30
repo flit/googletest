@@ -1154,7 +1154,7 @@ class StoredResultEventListener {
 // above.
 class EmptyStoredResultEventListener : public StoredResultEventListener{
  public:
-  virtual const BaseTestPartResult* TransformTestPartResult(const TestPartResult& /* test_part_result */) {};
+  virtual const BaseTestPartResult* TransformTestPartResult(const TestPartResult& /* test_part_result */) { return Null; }
   virtual void OutputXmlTestPartResult(::std::ostream* /* stream */,
                                        const BaseTestPartResult* /* base_test_part_result */) {};
 };
