@@ -3645,7 +3645,7 @@ void XmlUnitTestResultPrinter::OutputXmlTestPartResult(::std::ostream* stream,
     *stream << "      <failure message=\""
             << EscapeXmlAttribute(summary.c_str())
             << "\" type=\""
-            << (base_test_part_result->type() == BaseTestPartResult::kFatalFailure) ? "fatal_failure\">" : "non_fatal_failure\">";
+            << ((base_test_part_result->type() == BaseTestPartResult::kFatalFailure) ? "fatal_failure\">" : "non_fatal_failure\">");
     const string detail = location + "\n" + part->message();
     OutputXmlCDataSection(stream, RemoveInvalidXmlCharacters(detail).c_str());
     *stream << "</failure>\n";
