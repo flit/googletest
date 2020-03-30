@@ -40,6 +40,7 @@
 # include <windows.h>
 # include <io.h>
 # include <sys/stat.h>
+# include <map>  // Used in ThreadLocal.
 #elif !GTEST_OS_BARE_METAL
 # include <unistd.h>
 #endif  // GTEST_OS_WINDOWS

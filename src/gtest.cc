@@ -107,9 +107,7 @@
 # include <windows.h>  // NOLINT
 # undef min
 
-#elif GTEST_OS_BARE_METAL
-
-#else
+#elif !GTEST_OS_BARE_METAL
 
 // Assume other platforms have gettimeofday().
 // TODO(kenton@google.com): Use autoconf to detect availability of

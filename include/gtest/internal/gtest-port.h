@@ -210,7 +210,7 @@
 //
 // Synchronization:
 //   Mutex, MutexLock, ThreadLocal, GetThreadCount()
-//                  - synchronization primitives.
+//                            - synchronization primitives.
 //
 // Template meta programming:
 //   is_pointer     - as in TR1; needed on Symbian and IBM XL C/C++ only.
@@ -293,7 +293,6 @@
 
 // Determines the platform on which Google Test is compiled.
 #ifndef GTEST_OS_BARE_METAL
-
 #ifdef __CYGWIN__
 # define GTEST_OS_CYGWIN 1
 #elif defined __SYMBIAN32__
@@ -312,10 +311,10 @@
 #   define GTEST_OS_WINDOWS_PHONE 1
 #  elif WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_APP)
 #   define GTEST_OS_WINDOWS_RT 1
-# else
+#  else
     // WINAPI_FAMILY defined but no known partition matched.
     // Default to desktop.
-#  define GTEST_OS_WINDOWS_DESKTOP 1
+#   define GTEST_OS_WINDOWS_DESKTOP 1
 #  endif
 # else
 #  define GTEST_OS_WINDOWS_DESKTOP 1
@@ -324,7 +323,7 @@
 # define GTEST_OS_MAC 1
 # if TARGET_OS_IPHONE
 #  define GTEST_OS_IOS 1
-#  endif
+# endif
 #elif defined __FreeBSD__
 # define GTEST_OS_FREEBSD 1
 #elif defined __linux__
@@ -435,7 +434,6 @@
 
 // Brings in definitions for functions used in the testing::internal::posix
 // namespace (read, write, close, chdir, isatty, stat). We do not currently
-#if !GTEST_OS_BARE_METAL
 // use them on Windows Mobile.
 #if GTEST_OS_WINDOWS
 # if !GTEST_OS_WINDOWS_MOBILE
@@ -447,14 +445,13 @@
 // This assumption is verified by
 // WindowsTypesTest.CRITICAL_SECTIONIs_RTL_CRITICAL_SECTION.
 struct _RTL_CRITICAL_SECTION;
-#else
+#elif !GTEST_OS_BARE_METAL
 // This assumes that non-Windows OSes provide unistd.h. For OSes where this
 // is not the case, we need to include headers that provide the functions
 // mentioned above.
 # include <unistd.h>
 # include <strings.h>
 #endif  // GTEST_OS_WINDOWS
-#endif // GTEST_OS_BARE_METAL
 
 #if GTEST_OS_LINUX_ANDROID
 // Used to define __ANDROID_API__ matching the target NDK API level.
@@ -1063,10 +1060,10 @@ class Secret;
 # define GTEST_COMPILE_ASSERT_(expr, msg) static_assert(expr, #msg)
 #else  // !GTEST_LANG_CXX11
 template <bool>
-struct CompileAssert {
+  struct CompileAssert {
 };
 
-#define GTEST_COMPILE_ASSERT_(expr, msg) \
+# define GTEST_COMPILE_ASSERT_(expr, msg) \
   typedef ::testing::internal::CompileAssert<(static_cast<bool>(expr))> \
       msg[static_cast<bool>(expr) ? 1 : -1] GTEST_ATTRIBUTE_UNUSED_
 #endif  // !GTEST_LANG_CXX11
@@ -1458,7 +1455,7 @@ extern ::std::vector<testing::internal::string> g_argvs;
 
 // Defines synchronization primitives.
 #if GTEST_IS_THREADSAFE
-#if GTEST_HAS_PTHREAD
+# if GTEST_HAS_PTHREAD
 // Sleeps for (roughly) n milliseconds.  This function is only for testing
 // Google Test's own constructs.  Don't use it in user tests, either
 // directly or indirectly.
@@ -1941,8 +1938,8 @@ class MutexBase {
 };
 
 // Forward-declares a static mutex.
-# define GTEST_DECLARE_STATIC_MUTEX_(mutex) \
-    extern ::testing::internal::MutexBase mutex
+#  define GTEST_DECLARE_STATIC_MUTEX_(mutex) \
+     extern ::testing::internal::MutexBase mutex
 
 // Defines and statically (i.e. at link time) initializes a static mutex.
 // The initialization list here does not explicitly initialize each field,
@@ -1950,8 +1947,8 @@ class MutexBase {
 // particular, the owner_ field (a pthread_t) is not explicitly initialized.
 // This allows initialization to work whether pthread_t is a scalar or struct.
 // The flag -Wmissing-field-initializers must not be specified for this to work.
-# define GTEST_DEFINE_STATIC_MUTEX_(mutex) \
-    ::testing::internal::MutexBase mutex = { PTHREAD_MUTEX_INITIALIZER, false }
+#  define GTEST_DEFINE_STATIC_MUTEX_(mutex) \
+     ::testing::internal::MutexBase mutex = { PTHREAD_MUTEX_INITIALIZER, false }
 
 // The Mutex class can only be used for mutexes created at runtime. It
 // shares its API with MutexBase otherwise.
