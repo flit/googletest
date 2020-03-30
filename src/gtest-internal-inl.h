@@ -822,12 +822,21 @@ class GTEST_API_ UnitTestImpl {
   // track events inside Google Test.
   StoredResultEventListener* GetStoredResultEventListener();
 
+  // This function returns true, when storing test part results are allowed,
+  // else false.
+  bool getStoreTestPartResults();
+
+  // This function will disable saving test part results.
+  void DoNotStoreTestPartResults();
+
+  // This function will allow saving base test part results.
+  void StoreBaseTestPartResults();
+
+  // This function will allow saving full-supported test part results.
+  void StoreDefaultTestPartResults();
+
  private:
   friend class ::testing::UnitTest;
-
-  // The StoredResultEventListener object that owns implementation for event listener
-  // for stored test part results.
-  StoredResultEventListener* result_listener_;
 
   // Used by UnitTest::Run() to capture the state of
   // GTEST_FLAG(catch_exceptions) at the moment it starts.
@@ -944,6 +953,13 @@ class GTEST_API_ UnitTestImpl {
   bool catch_exceptions_;
 
   GTEST_DISALLOW_COPY_AND_ASSIGN_(UnitTestImpl);
+
+  // The StoredResultEventListener object that owns implementation for event listener
+  // for stored test part results.
+  StoredResultEventListener* result_listener_;
+
+  // Boolean member which allows or disables saving test part results.
+  bool store_test_part_results_;
 };  // class UnitTestImpl
 
 // Convenience function for accessing the global UnitTest

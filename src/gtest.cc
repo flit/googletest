@@ -672,7 +672,10 @@ DefaultGlobalTestPartResultReporter::DefaultGlobalTestPartResultReporter(
 
 void DefaultGlobalTestPartResultReporter::ReportTestPartResult(
     const TestPartResult& result) {
-  StoreTestPartResult(result);
+  if (unit_test_->getStoreTestPartResults() == true)
+  {
+    StoreTestPartResult(result);
+  }
   unit_test_->listeners()->repeater()->OnTestPartResult(result);
 }
 
@@ -3634,14 +3637,15 @@ void XmlUnitTestResultPrinter::OutputXmlTestInfo(::std::ostream* stream,
 // Prints an XML representation of a TestPartResult object.
 void XmlUnitTestResultPrinter::OutputXmlTestPartResult(::std::ostream* stream,
                                                        const BaseTestPartResult *base_test_part_result){
-  const TestPartResult* part = dynamic_cast<const TestPartResult*>(base_test_part_result);
+  const TestPartResult* part = DownCast_<const TestPartResult*>(base_test_part_result);
   if(part != NULL){
     const string location = internal::FormatCompilerIndependentFileLocation(
     part->file_name(), part->line_number());
     const string summary = location + "\n" + part->summary();
     *stream << "      <failure message=\""
-           << EscapeXmlAttribute(summary.c_str())
-           << "\" type=\"\">";
+            << EscapeXmlAttribute(summary.c_str())
+            << "\" type=\""
+            << (base_test_part_result->type() == BaseTestPartResult::kFatalFailure) ? "fatal_failure\">" : "non_fatal_failure\">";
     const string detail = location + "\n" + part->message();
     OutputXmlCDataSection(stream, RemoveInvalidXmlCharacters(detail).c_str());
     *stream << "</failure>\n";
@@ -3751,6 +3755,32 @@ void DefaultStoredResultEventListener::OutputXmlTestPartResult(::std::ostream* s
 };
 
 // End DefaultStoredResultEventListener
+
+// Class BaseStoredResultEventListener is copyable.
+//
+// This class implements the StoredResultEventListener interface
+class BaseStoredResultEventListener : public StoredResultEventListener{
+ public:
+  BaseStoredResultEventListener(){}
+
+  // The following methods override what's in the StoredResultEventListener class.
+  virtual const BaseTestPartResult* TransformTestPartResult(const TestPartResult& test_part_result);
+  virtual void OutputXmlTestPartResult(::std::ostream* stream ,
+                                       const BaseTestPartResult* base_test_part_result);
+};
+
+const BaseTestPartResult* BaseStoredResultEventListener::TransformTestPartResult(const TestPartResult& test_part_result) {
+  return new BaseTestPartResult(test_part_result.type());
+};
+
+void BaseStoredResultEventListener::OutputXmlTestPartResult(::std::ostream* stream,
+                                                            const BaseTestPartResult* base_test_part_result) {
+  *stream << "      <failure type=\""
+          << ((base_test_part_result->type() == BaseTestPartResult::kFatalFailure) ? "fatal_failure" : "non_fatal_failure")
+          << "\"></failure>\n";
+};
+
+// End BaseStoredResultEventListener
 
 #if GTEST_CAN_STREAM_RESULTS_
 
@@ -4097,13 +4127,28 @@ TestEventListeners& UnitTest::listeners() {
 // Set the event listener for stored test part results that can be used to
 // track events inside Google Test.
 void UnitTest::SetStoredResultEventListener(StoredResultEventListener* a_result_listener){
-    impl()->SetStoredResultEventListener(a_result_listener);
+  impl()->SetStoredResultEventListener(a_result_listener);
 }
 
 // Get the event listener for stored test part results that can be used to
 // track events inside Google Test.
 StoredResultEventListener* UnitTest::GetStoredResultEventListener(){
-    return impl()->GetStoredResultEventListener();
+  return impl()->GetStoredResultEventListener();
+}
+
+// This function will disable saving test part results.
+void UnitTest::DoNotStoreTestPartResults(){
+  impl()->DoNotStoreTestPartResults();
+}
+
+// This function will allow saving base test part results.
+void UnitTest::StoreBaseTestPartResults(){
+  impl()->StoreBaseTestPartResults();
+}
+
+// This function will allow saving full-supported test part results.
+void UnitTest::StoreDefaultTestPartResults(){
+  impl()->StoreDefaultTestPartResults();
 }
 
 // Registers and returns a global test environment.  When a test
@@ -4375,7 +4420,8 @@ UnitTestImpl::UnitTestImpl(UnitTest* parent)
 #endif
       // Will be overridden by the flag before first use.
       catch_exceptions_(false),
-      result_listener_(new DefaultStoredResultEventListener) {
+      result_listener_(new DefaultStoredResultEventListener),
+      store_test_part_results_(true){
   listeners()->SetDefaultResultPrinter(new PrettyUnitTestResultPrinter);
 }
 
@@ -4985,6 +5031,31 @@ void UnitTestImpl::SetStoredResultEventListener(StoredResultEventListener* a_res
 // track events inside Google Test.
 StoredResultEventListener* UnitTestImpl::GetStoredResultEventListener(){
   return result_listener_;
+}
+
+// This function returns true, when storing test part results are allowed,
+// else false.
+bool UnitTestImpl::getStoreTestPartResults() {
+  return store_test_part_results_;
+}
+
+// This function will disable saving test part results.
+void UnitTestImpl::DoNotStoreTestPartResults(){
+  store_test_part_results_ = false;
+  SetStoredResultEventListener(NULL);
+  listeners()->SetDefaultResultPrinter(NULL);
+}
+
+// This function will allow saving base test part results.
+void UnitTestImpl::StoreBaseTestPartResults(){
+  store_test_part_results_ = true;
+  SetStoredResultEventListener(new BaseStoredResultEventListener);
+}
+
+// This function will allow saving full-supported test part results.
+void UnitTestImpl::StoreDefaultTestPartResults(){
+  store_test_part_results_ = true;
+  SetStoredResultEventListener(new DefaultStoredResultEventListener);
 }
 
 // Returns the current OS stack trace as an std::string.

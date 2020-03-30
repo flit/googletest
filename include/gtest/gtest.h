@@ -1278,6 +1278,15 @@ class GTEST_API_ UnitTest {
   // track events inside Google Test.
   StoredResultEventListener* GetStoredResultEventListener();
 
+  // This function will disable saving test part results.
+  void DoNotStoreTestPartResults();
+
+  // This function will allow saving base test part results.
+  void StoreBaseTestPartResults();
+
+  // This function will allow saving full-supported test part results.
+  void StoreDefaultTestPartResults();
+
  private:
   // Registers and returns a global test environment.  When a test
   // program is run, all global test environments will be set-up in
